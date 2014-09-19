@@ -99,6 +99,8 @@ function ClusterIcon(cluster, styles) {
 
   this.cluster_ = cluster;
   this.className_ = cluster.getMarkerClusterer().getClusterClass();
+  this.classNameSelected_ = cluster.getMarkerClusterer().getClusterClassSelected();
+
   this.styles_ = styles;
   this.center_ = null;
   this.div_ = null;
@@ -118,8 +120,9 @@ ClusterIcon.prototype.onAdd = function () {
   var cDraggingMapByCluster;
 
   this.div_ = document.createElement("div");
-  this.div_.className = this.className_;
+
   if (this.visible_) {
+    this.div_.className = this.className_;
     this.show();
   }
 
@@ -147,25 +150,34 @@ ClusterIcon.prototype.onAdd = function () {
        * @param {Cluster} c The cluster that was clicked.
        * @event
        */
-      google.maps.event.trigger(mc, "click", cClusterIcon.cluster_);
-      google.maps.event.trigger(mc, "clusterclick", cClusterIcon.cluster_); // deprecated name
+      google.maps.event.trigger(mc, "click", cClusterIcon.cluster_, cClusterIcon.div_);
+      google.maps.event.trigger(mc, "clusterclick", cClusterIcon.cluster_, cClusterIcon.div_); // deprecated name
 
+      var setSelected = false;
       // The default click handler follows. Disable it by setting
       // the zoomOnClick property to false.
-      if (mc.getZoomOnClick()) {
+      //If the cluster size is greater than clusterSizeToZoom the zooming is done (even if zoomOnClick is false)
+      if (mc.getZoomOnClick() || cClusterIcon.cluster_.getSize() > mc.getClusterSizeToZoom()) {
         // Zoom into the cluster.
-        mz = mc.getMaxZoom();
-        theBounds = cClusterIcon.cluster_.getBounds();
-        mc.getMap().fitBounds(theBounds);
-        // There is a fix for Issue 170 here:
-        setTimeout(function () {
-          mc.getMap().fitBounds(theBounds);
-          // Don't zoom beyond the max zoom level
-          if (mz !== null && (mc.getMap().getZoom() > mz)) {
-            mc.getMap().setZoom(mz + 1);
-          }
-        }, 100);
-      }
+        mz = mc.maxZoom_;
+        if (mz !== null && (mc.getMap().getZoom() < mz)) {
+          mc.getMap().setZoom(mc.getMap().getZoom() + 1);
+          //theBounds = cClusterIcon.cluster_.getBounds();
+          //mc.getMap().fitBounds(theBounds);
+
+          // There is a fix for Issue 170 here:
+          //setTimeout(function () {
+            //mc.getMap().fitBounds(theBounds);
+            // Don't zoom beyond the max zoom level
+            //mc.getMap().setZoom(mc.getMap().getZoom() + 1);
+          //}, 100);
+        }else setSelected = true;
+      }else setSelected = true;
+
+      if(setSelected && cClusterIcon.div_)
+        cClusterIcon.cluster_.getMarkerClusterer().setSelectedCluster(cClusterIcon.div_.id);
+      else
+        cClusterIcon.cluster_.getMarkerClusterer().setSelectedCluster(undefined);
 
       // Prevent event propagation to the map:
       e.cancelBubble = true;
@@ -241,20 +253,28 @@ ClusterIcon.prototype.hide = function () {
  */
 ClusterIcon.prototype.show = function () {
   if (this.div_) {
-    var img = "";
+    //Deprecated use of image, now the styles are set using the clusterClass
+    //var img = "";
     // NOTE: values must be specified in px units
-    var bp = this.backgroundPosition_.split(" ");
-    var spriteH = parseInt(bp[0].trim(), 10);
-    var spriteV = parseInt(bp[1].trim(), 10);
+    //var bp = this.backgroundPosition_.split(" ");
+    //var spriteH = parseInt(bp[0].trim(), 10);
+    //var spriteV = parseInt(bp[1].trim(), 10);
     var pos = this.getPosFromLatLng_(this.center_);
     this.div_.style.cssText = this.createCss(pos);
-    img = "<img src='" + this.url_ + "' style='position: absolute; top: " + spriteV + "px; left: " + spriteH + "px; ";
+    /*img = "<img src='" + this.url_ + "' style='position: absolute; top: " + spriteV + "px; left: " + spriteH + "px; ";
     if (!this.cluster_.getMarkerClusterer().enableRetinaIcons_) {
       img += "clip: rect(" + (-1 * spriteV) + "px, " + ((-1 * spriteH) + this.width_) + "px, " +
           ((-1 * spriteV) + this.height_) + "px, " + (-1 * spriteH) + "px);";
     }
-    img += "'>";
-    this.div_.innerHTML = img + "<div style='" +
+    img += "'>";*/
+    this.div_.id = "clusterDiv_" + pos.x + "_" + pos.y;
+
+    if(this.div_.id === this.cluster_.getMarkerClusterer().getSelectedCluster())
+      this.div_.className = this.classNameSelected_;
+    else
+      this.div_.className = this.className_;
+
+    this.div_.innerHTML = /*img +*/ "<div style='" +
         "position: absolute;" +
         "top: " + this.anchorText_[0] + "px;" +
         "left: " + this.anchorText_[1] + "px;" +
@@ -506,6 +526,7 @@ Cluster.prototype.addMarker = function (marker) {
     marker.setMap(null);
   }
 
+  this.updateIcon_();
   return true;
 };
 
@@ -564,9 +585,14 @@ Cluster.prototype.updateIcon_ = function () {
  * @return {boolean} True if the marker has already been added.
  */
 Cluster.prototype.isMarkerAlreadyAdded_ = function (marker) {
-  for (var i = 0, n = this.markers_.length; i < n; i++) {
-    if (marker === this.markers_[i]) {
-      return true;
+  var i;
+  if (this.markers_.indexOf) {
+    return this.markers_.indexOf(marker) !== -1;
+  } else {
+    for (i = 0; i < this.markers_.length; i++) {
+      if (marker === this.markers_[i]) {
+        return true;
+      }
     }
   }
   return false;
@@ -681,6 +707,10 @@ function MarkerClusterer(map, opt_markers, opt_options) {
   if (opt_options.zoomOnClick !== undefined) {
     this.zoomOnClick_ = opt_options.zoomOnClick;
   }
+  this.clusterSizeToZoom_ = 0;
+  if (opt_options.clusterSizeToZoom !== undefined) {
+    this.clusterSizeToZoom_ = opt_options.clusterSizeToZoom;
+  }
   this.averageCenter_ = false;
   if (opt_options.averageCenter !== undefined) {
     this.averageCenter_ = opt_options.averageCenter;
@@ -704,6 +734,7 @@ function MarkerClusterer(map, opt_markers, opt_options) {
   this.batchSize_ = opt_options.batchSize || MarkerClusterer.BATCH_SIZE;
   this.batchSizeIE_ = opt_options.batchSizeIE || MarkerClusterer.BATCH_SIZE_IE;
   this.clusterClass_ = opt_options.clusterClass || "cluster";
+  this.clusterClassSelected_ = opt_options.clusterClassSelected || "cluster active";
 
   if (navigator.userAgent.toLowerCase().indexOf("msie") !== -1) {
     // Try to avoid IE timeout when processing a huge number of markers:
@@ -944,6 +975,26 @@ MarkerClusterer.prototype.setZoomOnClick = function (zoomOnClick) {
 
 
 /**
+ * Returns the value of the <code>clusterSizeToZoom</code> property.
+ *
+ * @return {number} The clusterSizeToZoom property is set.
+ */
+MarkerClusterer.prototype.getClusterSizeToZoom = function () {
+  return this.clusterSizeToZoom_;
+};
+
+
+/**
+ *  Sets the value of the <code>clusterSizeToZoom</code> property.
+ *
+ *  @param {number} clusterSizeToZoom The value of the clusterSizeToZoom property.
+ */
+MarkerClusterer.prototype.setClusterSizeToZoom = function (clusterSizeToZoom) {
+  this.clusterSizeToZoom_ = clusterSizeToZoom;
+};
+
+
+/**
  * Returns the value of the <code>averageCenter</code> property.
  *
  * @return {boolean} True if averageCenter property is set.
@@ -1142,6 +1193,45 @@ MarkerClusterer.prototype.setClusterClass = function (clusterClass) {
 
 
 /**
+ * Returns the value of the <code>clusterClassSelected</code> property.
+ *
+ * @return {string} the value of the clusterClassSelected property.
+ */
+MarkerClusterer.prototype.getClusterClassSelected = function () {
+  return this.clusterClassSelected_;
+};
+
+
+/**
+ * Sets the value of the <code>clusterClassSelected</code> property.
+ *
+ *  @param {string} clusterClassSelected The value of the clusterClassSelected property.
+ */
+MarkerClusterer.prototype.setClusterClassSelected = function (clusterClassSelected) {
+  this.clusterClassSelected_ = clusterClassSelected;
+};
+
+
+/**
+ * Returns the value of the <code>selectedCluster</code> property.
+ *
+ * @return {string} the value of the selectedCluster property.
+ */
+MarkerClusterer.prototype.getSelectedCluster = function () {
+  return this.selectedCluster_;
+};
+
+
+/**
+ * Sets the value of the <code>selectedCluster</code> property.
+ *
+ *  @param {string} selectedCluster The value of the selectedCluster property.
+ */
+MarkerClusterer.prototype.setSelectedCluster = function (selectedCluster) {
+  this.selectedCluster_ = selectedCluster;
+};
+
+/**
  *  Returns the array of markers managed by the clusterer.
  *
  *  @return {Array} The array of markers managed by the clusterer.
@@ -1209,7 +1299,7 @@ MarkerClusterer.prototype.addMarkers = function (markers, opt_nodraw) {
     if (markers.hasOwnProperty(key)) {
       this.pushMarkerTo_(markers[key]);
     }
-  }  
+  }
   if (!opt_nodraw) {
     this.redraw_();
   }
@@ -1347,7 +1437,7 @@ MarkerClusterer.prototype.repaint = function () {
   setTimeout(function () {
     var i;
     for (i = 0; i < oldClusters.length; i++) {
-      oldClusters[i].remove();
+        oldClusters[i].remove();
     }
   }, 0);
 };
@@ -1468,6 +1558,7 @@ MarkerClusterer.prototype.addToClosestCluster_ = function (marker) {
   var clusterToAddTo = null;
   for (i = 0; i < this.clusters_.length; i++) {
     cluster = this.clusters_[i];
+
     center = cluster.getCenter();
     if (center) {
       d = this.distanceBetweenPoints_(center, marker.getPosition());
@@ -1558,10 +1649,6 @@ MarkerClusterer.prototype.createClusters_ = function (iFirst) {
      * @event
      */
     google.maps.event.trigger(this, "clusteringend", this);
-
-    for (i = 0; i < this.clusters_.length; i++) {
-      this.clusters_[i].updateIcon_();
-    }
   }
 };
 
@@ -1665,7 +1752,15 @@ if (typeof String.prototype.trim !== 'function') {
    * @return {string} The string with removed whitespace
    */
   String.prototype.trim = function() {
-    return this.replace(/^\s+|\s+$/g, ''); 
+    return this.replace(/^\s+|\s+$/g, '');
   }
 }
 
+if (typeof exports !== 'undefined') {
+  if (typeof module !== 'undefined' && module.exports) {
+    exports = module.exports = MarkerClusterer;
+  }
+  exports._ = _;
+} else {
+  root._ = _;
+}
