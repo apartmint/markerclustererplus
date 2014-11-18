@@ -274,20 +274,24 @@ ClusterIcon.prototype.show = function () {
     else
       this.div_.className = this.className_;
 
-    this.div_.innerHTML = /*img +*/ "<div style='" +
-        "position: absolute;" +
-        "top: " + this.anchorText_[0] + "px;" +
-        "left: " + this.anchorText_[1] + "px;" +
-        "color: " + this.textColor_ + ";" +
-        "font-size: " + this.textSize_ + "px;" +
-        "font-family: " + this.fontFamily_ + ";" +
-        "font-weight: " + this.fontWeight_ + ";" +
-        "font-style: " + this.fontStyle_ + ";" +
-        "text-decoration: " + this.textDecoration_ + ";" +
-        "text-align: center;" +
-        "width: " + this.width_ + "px;" +
-        "line-height:" + this.height_ + "px;" +
-        "'>" + (this.cluster_.hideLabel_ ? ' ' : this.sums_.text) + "</div>";
+    var _transcludedLabel = this.cluster_.getMarkerClusterer().getTranscludedLabel();
+    if (_transcludedLabel)
+      this.div_.innerHTML = _transcludedLabel.replace('{{interpolated}}', this.sums_.text);
+    else
+      this.div_.innerHTML = "<div style='" +
+          "position: absolute;" +
+          "top: " + this.anchorText_[0] + "px;" +
+          "left: " + this.anchorText_[1] + "px;" +
+          "color: " + this.textColor_ + ";" +
+          "font-size: " + this.textSize_ + "px;" +
+          "font-family: " + this.fontFamily_ + ";" +
+          "font-weight: " + this.fontWeight_ + ";" +
+          "font-style: " + this.fontStyle_ + ";" +
+          "text-decoration: " + this.textDecoration_ + ";" +
+          "text-align: center;" +
+          "width: " + this.width_ + "px;" +
+          "line-height:" + this.height_ + "px;" +
+          "'>" + (this.cluster_.hideLabel_ ? ' ' : this.sums_.text) + "</div>";
     if (typeof this.sums_.title === "undefined" || this.sums_.title === "") {
       this.div_.title = this.cluster_.getMarkerClusterer().getTitle();
     } else {
@@ -597,7 +601,6 @@ Cluster.prototype.isMarkerAlreadyAdded_ = function (marker) {
   }
   return false;
 };
-
 
 /**
  * @name MarkerClustererOptions
@@ -1701,6 +1704,17 @@ MarkerClusterer.CALCULATOR = function (markers, numStyles) {
   };
 };
 
+/**
+ * Custom hook to set interpolated labels
+ *
+ * @param {string} label label with {{interpolated}} to be replaced with the sum
+ */
+MarkerClusterer.prototype.setTranscludedLabel = function (label) {
+  this.transcludedLabel = label;
+};
+MarkerClusterer.prototype.getTranscludedLabel = function () {
+  return this.transcludedLabel;
+};
 
 /**
  * The number of markers to process in one batch.
