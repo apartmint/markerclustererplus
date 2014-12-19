@@ -181,9 +181,11 @@ ClusterIcon.prototype.onAdd = function () {
 
       // Prevent event propagation to the map:
       e.cancelBubble = true;
-      if (e.stopPropagation) {
-        e.stopPropagation();
-      }
+      if (e.stop) e.stop();
+      if (e.stopPropagation) e.stopPropagation();
+      if (e.preventDefault) e.preventDefault();
+      else
+        e.returnValue = false;
     }
   });
 
