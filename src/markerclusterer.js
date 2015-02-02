@@ -276,9 +276,13 @@ ClusterIcon.prototype.show = function () {
     else
       this.div_.className = this.className_;
 
+    var clusterText = this.sums_.text;
+    if(clusterText && parseInt(clusterText) > 99)
+      clusterText = '99+';
+
     var _transcludedLabel = this.cluster_.getMarkerClusterer().getTranscludedLabel();
     if (_transcludedLabel)
-      this.div_.innerHTML = _transcludedLabel.replace('{{interpolated}}', this.sums_.text);
+      this.div_.innerHTML = _transcludedLabel.replace('{{interpolated}}', clusterText);
     else
       this.div_.innerHTML = "<div style='" +
           "position: absolute;" +
@@ -293,7 +297,7 @@ ClusterIcon.prototype.show = function () {
           "text-align: center;" +
           "width: " + this.width_ + "px;" +
           "line-height:" + this.height_ + "px;" +
-          "'>" + (this.cluster_.hideLabel_ ? ' ' : this.sums_.text) + "</div>";
+          "'>" + (this.cluster_.hideLabel_ ? ' ' : clusterText) + "</div>";
     if (typeof this.sums_.title === "undefined" || this.sums_.title === "") {
       this.div_.title = this.cluster_.getMarkerClusterer().getTitle();
     } else {
