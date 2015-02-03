@@ -277,8 +277,11 @@ ClusterIcon.prototype.show = function () {
       this.div_.className = this.className_;
 
     var clusterText = this.sums_.text;
-    if(clusterText && parseInt(clusterText) > 99)
+    var bigMarker = clusterText && parseInt(clusterText) > 99;
+    if(bigMarker) {
       clusterText = '99+';
+      this.div_.className = this.div_.className + ' big';
+    }
 
     var _transcludedLabel = this.cluster_.getMarkerClusterer().getTranscludedLabel();
     if (_transcludedLabel)
@@ -295,8 +298,8 @@ ClusterIcon.prototype.show = function () {
           "font-style: " + this.fontStyle_ + ";" +
           "text-decoration: " + this.textDecoration_ + ";" +
           "text-align: center;" +
-          "width: " + this.width_ + "px;" +
-          "line-height:" + this.height_ + "px;" +
+          "width: " + (this.width_ + (bigMarker ? 10 : 0)) + "px;" +
+          "line-height:" + (this.height_ + (bigMarker ? 10 : 0)) + "px;" +
           "'>" + (this.cluster_.hideLabel_ ? ' ' : clusterText) + "</div>";
     if (typeof this.sums_.title === "undefined" || this.sums_.title === "") {
       this.div_.title = this.cluster_.getMarkerClusterer().getTitle();
@@ -354,7 +357,6 @@ ClusterIcon.prototype.createCss = function (pos) {
   var style = [];
   style.push("cursor: pointer;");
   style.push("position: absolute; top: " + pos.y + "px; left: " + pos.x + "px;");
-  style.push("width: " + this.width_ + "px; height: " + this.height_ + "px;");
   return style.join("");
 };
 
